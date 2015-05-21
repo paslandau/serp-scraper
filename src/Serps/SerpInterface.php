@@ -19,7 +19,7 @@ interface SerpInterface
     /**
      * @return SerpPositionInterface[]
      */
-    public function getPositions();
+    public function getOrganicPositions();
 
     /**
      * @return string[]

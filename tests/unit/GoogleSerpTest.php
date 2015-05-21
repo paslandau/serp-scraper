@@ -116,7 +116,7 @@ class GoogleSerpTest extends PHPUnit_Framework_TestCase
     private function serpToArray(GoogleSerp $serp)
     {
         return [
-            "positions" => count($serp->getPositions()),
+            "positions" => count($serp->getOrganicPositions()),
             "relatedKeywords" => $serp->getRelatedKeywords(),
             "resultCount" => $serp->getResultCount()
         ];

@@ -7,22 +7,23 @@ use paslandau\IOUtility\IOUtil;
 use paslandau\SerpScraper\Exceptions\GoogleSerpParsingException;
 use paslandau\SerpScraper\Requests\GoogleSerpRequest;
 use paslandau\SerpScraper\Serps\GoogleSerp;
-use paslandau\SerpScraper\Serps\GoogleSerpPosition;
+use paslandau\SerpScraper\Serps\GoogleSerpOrganicPosition;
+use paslandau\SerpScraper\Serps\GoogleSerpPaidPosition;
+use paslandau\SerpScraper\Serps\SerpPositionInterface;
 
-class GoogleSerpPositionTest extends PHPUnit_Framework_TestCase
+class GoogleSerpPaidPositionTest extends PHPUnit_Framework_TestCase
 {
 
     public function test_ShouldParseNormalSerps()
     {
         $tests = [
             "normal-serps" => [
-                "input" => __DIR__ . "/resources/2015-04-01-google-normal-serps.html",
+                "input" => __DIR__ . "/resources/2015-05-21-ads-top-ads-side.html",
                 "expected" => [
-                    "title" => "Stiftung Warentest",
-                    "url" => "https://www.test.de/",
-                    "description" => "Abhilfe schafft ein Kanal- oder Frequenzwechsel. Wie das geht, erklären die \r\nExperten von test am Beispiel der weitverbreiteten Fritz!Box 7390. Zur Meldung 8\r\n.",
-                    "breadCrumb" => "https://www.test.de/",
-                    "blockedByRobotsTxt" => false
+                    "title" => "Hotels: Booking.com - Über 652.000 Hotels weltweit",
+                    "url" => "http://www.booking.com/index.de.html?aid=309654%3Blabel%3Dhotels-german-de-rz0zZRytMeOluv6MoKlndQS45957819412%3Apl%3Ata%3Ap1%3Ap2652.000%3Aac%3Aap1t1%3Aneg%3Bws%3D",
+                    "description" => "Buchen Sie jetzt Ihr Hotel!",
+                    "breadCrumb" => "www.booking.com/Hotels"
                 ]
             ],
         ];
@@ -37,16 +38,16 @@ class GoogleSerpPositionTest extends PHPUnit_Framework_TestCase
 
             $body = IOUtil::getFileContent($path);
             $resp = $this->getGuzzleResponse(200, $body, [], $effectiveUrl);
-            $position = new GoogleSerpPosition($serps, 1);
+            $position = new GoogleSerpPaidPosition($serps, 1, GoogleSerpPaidPosition::PLACEMENT_TOP);
 
             $content = $resp->getBody();
             $doc = new \DOMDocument();
             if (!@$doc->loadHTML($content)) {
-                throw new GoogleSerpParsingException($resp, "Error while parsing SERPs");
+                throw new GoogleSerpParsingException($resp, $serps, "Error while parsing SERPs");
             }
             $xpath = new \DOMXPath($doc);
 
-            $listingExpression = "(//li[@class = 'g' or contains(./@class,'g ')])[1]";
+            $listingExpression = "(//div[@id='tads' or @id='center_col']//li[@class = 'ads-ad' or contains(./@class,'ads-ad ')])[1]";
             $listingNode = $xpath->query($listingExpression)->item(0);
 
             $excMsg = "";
@@ -71,6 +72,10 @@ class GoogleSerpPositionTest extends PHPUnit_Framework_TestCase
         }
     }
 
+    public function test_ShouldIdentifyVerticals(){
+        //todo implement test
+    }
+
     private function getGuzzleResponse($statusCode, $body, $headers = [])
     {
         $bodyStream = new Stream(fopen('php://temp', 'r+'));// see Guzzle 4.1.7 > GuzzleHttp\Adapter\Curl\RequestMediator::writeResponseBody
@@ -79,14 +84,13 @@ class GoogleSerpPositionTest extends PHPUnit_Framework_TestCase
         return $resp;
     }
 
-    private function toArray(GoogleSerpPosition $position)
+    private function toArray(SerpPositionInterface $position)
     {
         return [
             "title" => $position->getTitle(),
             "url" => $position->getUrl(),
             "description" => $position->getDescription(),
             "breadCrumb" => $position->getBreadCrumb(),
-            "blockedByRobotsTxt" => $position->isBlocketByRobotsTxt()
         ];
     }
 }

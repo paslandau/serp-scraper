@@ -2,8 +2,8 @@
 
 namespace paslandau\SerpScraper\Serps;
 
+use DOMXPath;
 use GuzzleHttp\Message\ResponseInterface;
-use paslandau\DataFiltering\Transformation\DomDocumentTransformer;
 use paslandau\DomUtility\DomConverter;
 use paslandau\DomUtility\DomUtil;
 use paslandau\SerpScraper\Exceptions\GoogleBlockedException;
@@ -20,9 +20,14 @@ class GoogleSerp implements SerpInterface
     private $request;
 
     /**
-     * @var GoogleSerpPosition[]
+     * @var GoogleSerpOrganicPosition[]
      */
-    private $positions;
+    private $organicPositions;
+
+    /**
+     * @var GoogleSerpPaidPosition[]
+     */
+    private $paidPositions;
 
     /**
      * @var string[]
@@ -43,17 +48,22 @@ class GoogleSerp implements SerpInterface
 
     /**
      * @param GoogleSerpRequest $request
-     * @param GoogleSerpPosition[]|null $positions [optional]. Default: null ([]).
+     * @param GoogleSerpOrganicPosition[]|null $positions [optional]. Default: null ([]).
      * @param string[]|null $relatedKeywords [optional]. Default: null ([]).
      * @param string|null $resultCount [optional]. Default: null ("0").
+     * @param GoogleSerpPaidPosition[] $paidPositions [optional]. Default: null ([]).
      */
-    function __construct(GoogleSerpRequest $request, array $positions = null, array $relatedKeywords = null, $resultCount = null)
+    function __construct(GoogleSerpRequest $request, array $positions = null, array $relatedKeywords = null, $resultCount = null, $paidPositions = null)
     {
         $this->request = $request;
         if($positions === null) {
             $positions = [];
         }
-        $this->positions = $positions;
+        $this->organicPositions = $positions;
+        if($paidPositions === null) {
+            $paidPositions = [];
+        }
+        $this->paidPositions = $paidPositions;
         if($relatedKeywords === null) {
             $relatedKeywords = [];
         }
@@ -104,6 +114,34 @@ class GoogleSerp implements SerpInterface
 
         $xpath = new \DOMXPath($doc);
 
+        $this->parseRelatedKeywords($xpath);
+        /* resultCount */
+        $this->parseResultCount($xpath);
+
+        /* SERP Positions */
+        $errors = [];
+        $organicErrors = $this->parseOrganicPositions($xpath, $resp);
+        $errors = array_merge($errors,$organicErrors);
+
+        /* Paid Positions */
+        $constants = (new \ReflectionClass(GoogleSerpPaidPosition::class))->getConstants();
+        foreach($constants as $constantName => $constant) {
+            if(!preg_match("#^PLACEMENT_#",$constantName)){
+                continue;
+            }
+            $paidErrors = $this->parseAdwordsPositions($xpath, $resp, $constant);
+            $errors = array_merge($errors, $paidErrors);
+        }
+
+        if(count($errors) > 0){
+            throw new GoogleSerpParsingException($resp, $this, "Errors while parsing serp positions",$errors);
+        }
+    }
+
+    /**
+     * @param DOMXPath $xpath
+     */
+    private function parseRelatedKeywords(DomXpath $xpath){
         /* related searches */
         $relatedKeywords = array();
         $query = '//div[@id="res"]/following-sibling::div[@style]//table//a';
@@ -113,45 +151,7 @@ class GoogleSerp implements SerpInterface
             $relatedKeywords[] = $relNode->nodeValue;
         }
         $this->relatedKeywords = $relatedKeywords;
-        /* resultCount */
-        $resultCount = "0";
-        $resultCountExpression = '//div[@id="resultStats"]';
-        $resultCountNodes = $xpath->query($resultCountExpression);
-        if($resultCountNodes->length != 0){
-            $text = $resultCountNodes->item(0)->nodeValue;
-            $pattern = "#(?P<num>[1-9][0-9.,]*)#";
-            if(preg_match_all($pattern,$text,$matches)){
-                $match = end($matches["num"]); // in case we have multiple numbers, like in "Seite 2 von ungefähr 2.690.000.000 Ergebnissen"
-                $val = str_replace(array(".",","), "", $match);
-                $resultCount = $val;
-            }
-        }
-        $this->resultCount = $resultCount;
-
-        /* SERP Positions */
-        $position = 1;
-        $listingExpression = "//li[@class = 'g' or contains(./@class,'g ')]";
-        $listingNodes = $xpath->query($listingExpression);
-        $errors = [];
-        foreach($listingNodes as $node){
-            try {
-                $serpPosition = new GoogleSerpPosition($this, $position);
-                $serpPosition->parseDomNode($node, $resp);
-                $this->positions[] = $serpPosition;
-                $this->positions++;
-            }catch(GoogleSerpPositionParsingException $e){
-                $errors[] = $e;
-            }catch(\Exception $e){
-                $errors[] = new GoogleSerpPositionParsingException($node,$position,"Error while parsing serp position (see previous exception for detail)",null,$e);
-            }
-            $position++;
-        }
-        if(count($errors) > 0){
-            throw new GoogleSerpParsingException($resp, $this, "Errors while parsing serp positions",$errors);
-        }
     }
-
-
 
     /**
      * @return GoogleSerpRequest
@@ -170,19 +170,19 @@ class GoogleSerp implements SerpInterface
     }
 
     /**
-     * @return GoogleSerpPosition[]
+     * @return GoogleSerpOrganicPosition[]
      */
-    public function getPositions()
+    public function getOrganicPositions()
     {
-        return $this->positions;
+        return $this->organicPositions;
     }
 
     /**
-     * @param GoogleSerpPosition[] $positions
+     * @param GoogleSerpOrganicPosition[] $organicPositions
      */
-    public function setPositions($positions)
+    public function setOrganicPositions($organicPositions)
     {
-        $this->positions = $positions;
+        $this->organicPositions = $organicPositions;
     }
 
     /**
@@ -218,23 +218,148 @@ class GoogleSerp implements SerpInterface
     }
 
     /**
-     * @return string[][]
+     * @param bool $includeAds
+     * @param null $placement
+     * @return \string[][]
      */
-    public function toArray(){
+    public function toArray($includeAds = false, $placement = null){
         $result = [];
         $res = $this->getRequest()->toArray();
         $res["resultCount"] = $this->getResultCount();
-        foreach($this->positions as $position){
-            $posRes = [
-                "position" => $position->getPosition(),
-                "url" => $position->getUrl(),
-                "title" => $position->getTitle(),
-                "breadCrumb" => $position->getBreadCrumb(),
-                "description" => $position->getDescription(),
-                "googleVertical" => $position->getGoogleVertical(),
-            ];
+        foreach($this->organicPositions as $position){
+//            $posRes = [
+//                "position" => $position->getPosition(),
+//                "url" => $position->getUrl(),
+//                "title" => $position->getTitle(),
+//                "breadCrumb" => $position->getBreadCrumb(),
+//                "description" => $position->getDescription(),
+//                "googleVertical" => $position->getGoogleVertical(),
+//            ];
+            $posRes = $position->toArray();
             $result[] = $res + $posRes;
         }
+        if($includeAds){
+            $positions = $this->getPaidPositions($placement);
+            foreach($positions as $position){
+                $posRes = $position->toArray();
+                $result[] = $res + $posRes;
+            }
+        }
         return $result;
+    }
+
+    /**
+     * @param DOMXPath $xpath
+     * @return string
+     */
+    private function parseResultCount(DOMXPath $xpath)
+    {
+        $resultCount = "0";
+        $resultCountExpression = '//div[@id="resultStats"]';
+        $resultCountNodes = $xpath->query($resultCountExpression);
+        if($resultCountNodes->length != 0){
+            $text = $resultCountNodes->item(0)->nodeValue;
+            $pattern = "#(?P<num>[1-9][0-9.,]*)#";
+            // caution, sometimes the load time is included ==> Ungefähr 375.000 Ergebnisse (0,38 Sekunden) 
+            // >> remove everything between brackets
+            $text = preg_replace("#\\(.*?\\)#","",$text);
+            if(preg_match_all($pattern,$text,$matches)){
+                $match = end($matches["num"]); // in case we have multiple numbers, like in "Seite 2 von ungefähr 2.690.000.000 Ergebnissen"
+
+                $val = str_replace(array(".",","), "", $match);
+                $resultCount = $val;
+            }
+        }
+        $this->resultCount = $resultCount;
+    }
+
+    /**
+     * @param DOMXPath $xpath
+     * @param ResponseInterface $resp
+     * @return \paslandau\SerpScraper\Exceptions\GoogleSerpPositionParsingException[]
+     */
+    private function parseOrganicPositions(DOMXPath $xpath, ResponseInterface $resp)
+    {
+        $position = 1;
+        $listingExpression = "//li[@class = 'g' or contains(./@class,'g ')]";
+        $listingNodes = $xpath->query($listingExpression);
+        $errors = [];
+        foreach($listingNodes as $node){
+            $serpPosition = new GoogleSerpOrganicPosition($this, $position);
+            try {
+                $serpPosition->parseDomNode($node, $resp);
+                $this->organicPositions[] = $serpPosition;
+            }catch(GoogleSerpPositionParsingException $e){
+                $errors[] = $e;
+            }catch(\Exception $e){
+                $errors[] = new GoogleSerpPositionParsingException($node,$serpPosition,"Error while parsing $position. serp organic position (see previous exception for detail)",null,$e);
+            }
+            $position++;
+        }
+        return $errors;
+    }
+
+    /**
+     * @param DOMXPath $xpath
+     * @param ResponseInterface $resp
+     * @return \paslandau\SerpScraper\Exceptions\GoogleSerpPositionParsingException[]
+     */
+    private function parseAdwordsPositions(DOMXPath $xpath, ResponseInterface $resp, $placement)
+    {
+        $position = 1;
+        $parentDiv = "//";
+        switch ($placement) {
+            case GoogleSerpPaidPosition::PLACEMENT_TOP: {
+                $parentDiv .= "div[@id='tads' or @id='center_col']";
+                break;
+            }
+            case GoogleSerpPaidPosition::PLACEMENT_SIDE: {
+                $parentDiv .= "div[@id='rhs' or @id='rhs_block']";
+                break;
+            }
+            // todo finde example for bottom ads with correct id > btm is just a guess!
+            case GoogleSerpPaidPosition::PLACEMENT_BOTTOM: {
+                $parentDiv .= "div[@id='btm']";
+                break;
+            }
+            default: {
+                throw new \InvalidArgumentException("Value '$placement' unknown as placement. See " . GoogleSerpPaidPosition::class . " constants for valid values.");
+            }
+        }
+        $listingExpression = "{$parentDiv}//li[@class = 'ads-ad' or contains(./@class,'ads-ad ')]";
+        $listingNodes = $xpath->query($listingExpression);
+        $errors = [];
+        foreach($listingNodes as $node){
+            $serpPosition = new GoogleSerpPaidPosition($this, $position, $placement);
+            try {
+                $serpPosition->parseDomNode($node, $resp);
+                $this->paidPositions[] = $serpPosition;
+            }catch(GoogleSerpPositionParsingException $e){
+                $errors[] = $e;
+            }catch(\Exception $e){
+                $errors[] = new GoogleSerpPositionParsingException($node,$serpPosition,"Error while parsing $position. serp $placement paid position (see previous exception for detail)",null,$e);
+            }
+            $position++;
+        }
+        return $errors;
+    }
+
+    /**
+     *
+     * @param string|null $placement [optional]. Default: null. If set, only positions of the $placement are returned. If null, all paid positions are returned.
+     * @return GoogleSerpPaidPosition[]
+     */
+    public function getPaidPositions($placement = null)
+    {
+        if($placement === null){
+            return $this->paidPositions;
+        }
+        $positions = [];
+        foreach($this->paidPositions as $position){
+            if($position->getPlacement() === $placement){
+                $positions[] = $position;
+            }
+        }
+        return $positions;
     }
 }

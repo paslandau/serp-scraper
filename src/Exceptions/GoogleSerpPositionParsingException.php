@@ -6,6 +6,7 @@ namespace paslandau\SerpScraper\Exceptions;
 use DOMNode;
 use GuzzleHttp\Message\ResponseInterface;
 use paslandau\QueryScraper\Exceptions\QueryScraperException;
+use paslandau\SerpScraper\Serps\SerpPositionInterface;
 
 class GoogleSerpPositionParsingException extends QueryScraperException{
 
@@ -15,18 +16,18 @@ class GoogleSerpPositionParsingException extends QueryScraperException{
     private $domNode;
 
     /**
-     * @var int
+     * @var SerpPositionInterface
      */
     private $position;
 
     /**
      * @param DOMNode $node
-     * @param int $position
+     * @param SerpPositionInterface $position
      * @param string $message
      * @param null|int $code
      * @param null|\Exception $previous
      */
-    public function __construct(DomNode $node, $position, $message, $code = null, \Exception $previous = null){
+    public function __construct(DomNode $node, SerpPositionInterface $position, $message, $code = null, \Exception $previous = null){
         $this->domNode = $node;
         $this->position = $position;
 
@@ -53,7 +54,7 @@ class GoogleSerpPositionParsingException extends QueryScraperException{
     }
 
     /**
-     * @return int
+     * @return SerpPositionInterface
      */
     public function getPosition()
     {
@@ -61,9 +62,9 @@ class GoogleSerpPositionParsingException extends QueryScraperException{
     }
 
     /**
-     * @param int $position
+     * @param SerpPositionInterface $position
      */
-    public function setPosition($position)
+    public function setPosition(SerpPositionInterface $position)
     {
         $this->position = $position;
     }
