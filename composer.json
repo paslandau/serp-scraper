@@ -1,0 +1,35 @@
+{
+    "name": "paslandau/serp-scraper",
+    "license": "MIT",
+    "description" : "Library to scrape search engines",
+    "authors": [
+        {
+            "name": "Pascal Landau",
+            "email": "kontakt@myseosolution.de",
+            "homepage": "http://www.myseosolution.de",
+            "role": "Developer"
+        }
+    ],
+	"autoload": {
+	    "psr-4": {
+	        "paslandau\\SerpScraper\\": "src/"
+	    }
+	},
+    "repositories": [ { "type": "composer", "url": "http://packages.myseosolution.de/"} ],
+    "minimum-stability": "dev",
+    "require" : {
+        "php": "~5.5",
+        "guzzlehttp/guzzle": "~5.2",
+        "paslandau/web-utility": "dev-master",
+        "paslandau/query-scraper": "dev-master"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "~4",
+        "paslandau/array-utility": "dev-master"
+    },
+    "suggest" : {
+      "paslandau/guzzle-rotating-proxy-subscriber": "dev-master",
+        "paslandau/guzzle-application-cache-subscriber": "dev-master",
+        "paslandau/guzzle-auto-charset-encoding-subscriber": "dev-master"
+    }
+}
