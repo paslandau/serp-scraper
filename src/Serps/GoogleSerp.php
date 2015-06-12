@@ -307,19 +307,18 @@ class GoogleSerp implements SerpInterface
     private function parseAdwordsPositions(DOMXPath $xpath, ResponseInterface $resp, $placement)
     {
         $position = 1;
-        $parentDiv = "//";
+        $parentDiv = "";
         switch ($placement) {
             case GoogleSerpPaidPosition::PLACEMENT_TOP: {
-                $parentDiv .= "div[@id='tads' or @id='center_col']";
+                $parentDiv .= "//div[@id='center_col']//div[@id='tads' or following::div[@id='res']]";
                 break;
             }
             case GoogleSerpPaidPosition::PLACEMENT_SIDE: {
-                $parentDiv .= "div[@id='rhs' or @id='rhs_block']";
+                $parentDiv .= "//div[@id='rhs' or @id='rhs_block']";
                 break;
             }
-            // todo finde example for bottom ads with correct id > btm is just a guess!
             case GoogleSerpPaidPosition::PLACEMENT_BOTTOM: {
-                $parentDiv .= "div[@id='btm']";
+                $parentDiv .= "//div[@id='center_col']//div[@id='bottomads' or preceding::div[@id='res']]";
                 break;
             }
             default: {

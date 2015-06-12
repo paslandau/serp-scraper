@@ -1,7 +1,7 @@
 {
     "name": "paslandau/serp-scraper",
     "license": "MIT",
-    "description" : "Library to scrape search engines",
+    "description" : "Library to scrape search engine results pages",
     "authors": [
         {
             "name": "Pascal Landau",
@@ -19,13 +19,13 @@
     "minimum-stability": "dev",
     "require" : {
         "php": "~5.5",
-        "guzzlehttp/guzzle": "~5.2",
-        "paslandau/web-utility": "dev-master",
+        "guzzlehttp/guzzle": "^5.3.0",
+        "paslandau/web-utility": "^0.2.0",
         "paslandau/query-scraper": "dev-master"
     },
     "require-dev": {
         "phpunit/phpunit": "~4",
-        "paslandau/array-utility": "dev-master"
+        "paslandau/array-utility": "^0.1.2"
     },
     "suggest" : {
       "paslandau/guzzle-rotating-proxy-subscriber": "dev-master",

@@ -1,7 +1,15 @@
 #serp-scraper
-[![Build Status](https://travis-ci.org/paslandau/serp-scraper.svg?branch=master)](https://travis-ci.org/paslandau/serp-scraper)
+Library to scrape search engine results pages
 
-Library to query search engine results pages
+<!---
+[![Build Status](https://travis-ci.org/paslandau/serp-scraper.svg?branch=master)](https://travis-ci.org/paslandau/serp-scraper)
+-->
+
+#WORK IN PROGRESS!
+
+- personal backup
+- no unit tests
+- use at your own risk
 
 ##Description
 

@@ -90,7 +90,7 @@ class GoogleSerpOrganicPositionTest extends PHPUnit_Framework_TestCase
             "url" => $position->getUrl(),
             "description" => $position->getDescription(),
             "breadCrumb" => $position->getBreadCrumb(),
-            "blockedByRobotsTxt" => $position->isBlocketByRobotsTxt()
+            "blockedByRobotsTxt" => $position->isBlockedByRobotsTxt()
         ];
     }
 }
