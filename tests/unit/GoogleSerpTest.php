@@ -66,7 +66,38 @@ class GoogleSerpTest extends PHPUnit_Framework_TestCase
             "blocked" => [
                 "input" => __DIR__ . "/resources/2015-04-01-google-blocked.html",
                 "expected" => GoogleBlockedException::class,
+            ],
+            "blocked-no-captcha" => [
+                "input" => __DIR__ . "/resources/2015-08-17-google-blocked-no-captcha.html",
+                "expected" => GoogleBlockedException::class,
+            ],
+            "vertical-maps-old" => [
+                "input" => __DIR__ . "/resources/2015-04-10-google-vertical-maps-old.html",
+                "expected" => [
+                    "positions" => 11,
+                    "relatedKeywords" => [
+                        "tchibo aalen tel",
+                        "tchibo aalen adresse",
+                        "tchibo aalen württ öffnungszeiten",
+                        "tchibo aalen telefonnummer",
+                        "tchibo gmbh aalen",
+                        "tchibo filialen in aalen württ",
+                        "tchibo aalen angebote",
+                        "tchibo gmbh",
+                    ],
+                    "resultCount" => "35100"
+                ]
+            ],
+            "vertical-maps-new" => [
+                "input" => __DIR__ . "/resources/2015-08-28-google-vertical-maps-new.html",
+                "expected" => [
+                    "positions" => 11,
+                    "relatedKeywords" => [
+                    ],
+                    "resultCount" => "176000"
+                ]
             ]
+
             ];
 
         /** @var PHPUnit_Framework_MockObject_MockObject|GoogleSerpRequest $request */

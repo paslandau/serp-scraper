@@ -50,7 +50,8 @@ class GoogleSerpPaidPosition extends GoogleSerpPosition{
     }
 
     protected function getTitleXpath(){
-        return "(.//a[text()!=''])[1]";
+//        return "( (.//a[text()!='']) )[1]";
+        return "( (.//*[(self::a or (self::b and (../../a)) ) and text()!='']) )[1]";
     }
 
     protected function getBreadCrumbXpath(){

@@ -81,6 +81,8 @@ class GoogleSerpOrganicPosition extends GoogleSerpPosition
                 '/publicdata/explore' => "publicData",
                 '/products/catalog' => "shopping",
                 "/maps" => "maps",
+                "/maps/uv" => "places",
+                "/maps/place" => "places",
                 "/images" => "images",
                 "/imghp" => "images",
                 "/news" => "news",
@@ -92,6 +94,7 @@ class GoogleSerpOrganicPosition extends GoogleSerpPosition
                 "/interstitial" => "malware",
                 "/translate" => false, //not a vertical, just go on..
                 "/search" => false, // continue with params
+                "/" => false, // not a vertical, go on..
             ],
                 "fn" => function ($url) {
                     $segments = WebUtil::getPathSegments($url);
@@ -124,6 +127,7 @@ class GoogleSerpOrganicPosition extends GoogleSerpPosition
                     'dsc' => "discussion",
                     'app' => "app",
                     'pts' => "patent",
+                    'lcl' => 'maps'
                 ],
                 "fn" => function ($url) use ($getQueryParam) {
                     return $getQueryParam($url, "tbm");
@@ -232,6 +236,7 @@ class GoogleSerpOrganicPosition extends GoogleSerpPosition
     private function parseBlockedByRobotsTxt($node)
     {
         $xpath = new \DOMXPath($node->ownerDocument);
+//        http://support.google.com/webmasters/bin/answer.py?answer=156449&hl=de
         $blockedExpression = ".//span[@class='st']//a[contains(./@href,'answer.py?answer=156449')]";
         $isBlocked = DomUtil::elementExists($xpath, $blockedExpression, $node);
         return $isBlocked;

@@ -79,11 +79,12 @@ class GoogleSerp implements SerpInterface
     private function getDomDoc(ResponseInterface $resp){
         $content = $resp->getBody()->__toString();
         $doc = $this->domConverter->convert($content);
-//        $doc = new \DOMDocument();
-//        if(!@$doc->loadHTML($content)){
+//        $doc2 = new \DOMDocument();
+//        if(!@$doc2->loadHTML($content)){
 //            throw new GoogleSerpParsingException($resp, $this, "Error while parsing SERPs");
 //        }
-//        $foo = $doc->saveHTML();
+//        $foo = $doc2->saveHTML();
+//        echo $foo;
         return $doc;
     }
 
@@ -96,8 +97,17 @@ class GoogleSerp implements SerpInterface
     public function isIpBlocked(ResponseInterface $resp){
         $doc = $this->getDomDoc($resp);
         $xpath = new \DOMXPath($doc);
-        $query = "//form//input[@id='captcha']";
-        $isBlocked = DomUtil::elementExists($xpath, $query);
+        $queries = [
+            "//form//input[@id='captcha']",
+            "//a[contains(./@href,'//support.google.com/websearch/answer/86640')]"
+        ];
+        $isBlocked = false;
+        foreach($queries as $query) {
+            $isBlocked = DomUtil::elementExists($xpath, $query);
+            if($isBlocked){
+                return $isBlocked;
+            }
+        }
         return $isBlocked;
     }
 
@@ -274,6 +284,65 @@ class GoogleSerp implements SerpInterface
     }
 
     /**
+     * Get the list of organic positions as DomNodes
+     * @param DOMXPath $xpath
+     * @return \DOMNodeList
+     */
+    public static function getOrganicPositionList(DOMXPath $xpath){
+        $containsG = DomUtil::getContainsXpathExpression("@class", "g");
+//        $containsG = "@class='g'";
+        // caution: multiple expressions wont work because they screw up the order of the serps!
+//        $listingExpressions = []; // we need multiple expressions because googles UI is so inconsistent that it's hardly possible to cover everything in one expression
+//        $listingExpressions[] = "//*[self::div and ( ({$containsG}) or (./li[({$containsG})]) )]"; //either contains class 'g' (normal serps) or has li's having class 'g' (news boxes)
+//        $listingExpressions[] = "//ol[@id='rso']/li[({$containsG})]"; //either contains class 'g' (normal serps) or has li's having class 'g' (news boxes)
+//        $listingNodes = [];
+//        foreach($listingExpressions as $listingExpression) {
+////        $listingExpression = "//li[@class = 'g' or contains(./@class,'g ')]";
+//            $nodes = $xpath->query($listingExpression);
+//            foreach($nodes as $node){
+//                $listingNodes[] = $node;
+//            }
+//        }
+        $containsXhb = DomUtil::getContainsXpathExpression("@class", "_Xhb");
+        $newLocalPackExpression = "self::div[$containsXhb and .//a[contains(./@href,'tbm=lcl')]]";
+        $listingExpression = "//*[( self::div and (({$containsG}) or ./li[({$containsG})]) ) or (self::li and ({$containsG}) and (.//h3 or .//div[@role='heading']) ) or ($newLocalPackExpression)]"; //either contains class 'g' (normal serps) or has li's having class 'g' (news boxes)
+//        echo $listingExpression."\n"; // > //*[( self::div and ((@class='g' or contains(./@class,' g ') or starts-with(./@class,'g ') or substring(@class, string-length(@class) - string-length(' g')+1) = ' g') or ./li[(@class='g' or contains(./@class,' g ') or starts-with(./@class,'g ') or substring(@class, string-length(@class) - string-length(' g')+1) = ' g')]) ) or (self::li and (@class='g' or contains(./@class,' g ') or starts-with(./@class,'g ') or substring(@class, string-length(@class) - string-length(' g')+1) = ' g') and (.//h3 or .//div[@role='heading']) )]
+
+        $listingNodes = $xpath->query($listingExpression);
+        return $listingNodes;
+    }
+
+    /**
+     * Get the list of paid positions as DomNodes
+     * @param DOMXPath $xpath
+     * @param string $placement - @see GoogleSerpPaidPosition::PLAMENENT_ constants
+     * @return \DOMNodeList
+     */
+    public static function getPaidPositionList(DOMXPath $xpath, $placement){
+        $parentDiv = "";
+        switch ($placement) {
+            case GoogleSerpPaidPosition::PLACEMENT_TOP: {
+                $parentDiv .= "//div[@id='center_col']//div[@id='tads' or following::div[@id='res']]";
+                break;
+            }
+            case GoogleSerpPaidPosition::PLACEMENT_SIDE: {
+                $parentDiv .= "//*[(self::div or self::td) and (@id='rhs' or @id='rhs_block')]";
+                break;
+            }
+            case GoogleSerpPaidPosition::PLACEMENT_BOTTOM: {
+                $parentDiv .= "//div[@id='center_col']//div[@id='bottomads' or preceding::div[@id='res']]";
+                break;
+            }
+            default: {
+                throw new \InvalidArgumentException("Value '$placement' unknown as placement. See " . GoogleSerpPaidPosition::class . " constants for valid values.");
+            }
+        }
+        $listingExpression = "{$parentDiv}//li[@class = 'ads-ad' or contains(./@class,'ads-ad ')]";
+        $listingNodes = $xpath->query($listingExpression);
+        return $listingNodes;
+    }
+
+    /**
      * @param DOMXPath $xpath
      * @param ResponseInterface $resp
      * @return \paslandau\SerpScraper\Exceptions\GoogleSerpPositionParsingException[]
@@ -281,8 +350,7 @@ class GoogleSerp implements SerpInterface
     private function parseOrganicPositions(DOMXPath $xpath, ResponseInterface $resp)
     {
         $position = 1;
-        $listingExpression = "//li[@class = 'g' or contains(./@class,'g ')]";
-        $listingNodes = $xpath->query($listingExpression);
+        $listingNodes = self::getOrganicPositionList($xpath);
         $errors = [];
         foreach($listingNodes as $node){
             $serpPosition = new GoogleSerpOrganicPosition($this, $position);
@@ -302,31 +370,13 @@ class GoogleSerp implements SerpInterface
     /**
      * @param DOMXPath $xpath
      * @param ResponseInterface $resp
+     * @param string $placement - @see GoogleSerpPaidPosition::PLAMENENT_ constants
      * @return \paslandau\SerpScraper\Exceptions\GoogleSerpPositionParsingException[]
      */
     private function parseAdwordsPositions(DOMXPath $xpath, ResponseInterface $resp, $placement)
     {
         $position = 1;
-        $parentDiv = "";
-        switch ($placement) {
-            case GoogleSerpPaidPosition::PLACEMENT_TOP: {
-                $parentDiv .= "//div[@id='center_col']//div[@id='tads' or following::div[@id='res']]";
-                break;
-            }
-            case GoogleSerpPaidPosition::PLACEMENT_SIDE: {
-                $parentDiv .= "//div[@id='rhs' or @id='rhs_block']";
-                break;
-            }
-            case GoogleSerpPaidPosition::PLACEMENT_BOTTOM: {
-                $parentDiv .= "//div[@id='center_col']//div[@id='bottomads' or preceding::div[@id='res']]";
-                break;
-            }
-            default: {
-                throw new \InvalidArgumentException("Value '$placement' unknown as placement. See " . GoogleSerpPaidPosition::class . " constants for valid values.");
-            }
-        }
-        $listingExpression = "{$parentDiv}//li[@class = 'ads-ad' or contains(./@class,'ads-ad ')]";
-        $listingNodes = $xpath->query($listingExpression);
+        $listingNodes = self::getPaidPositionList($xpath,$placement);
         $errors = [];
         foreach($listingNodes as $node){
             $serpPosition = new GoogleSerpPaidPosition($this, $position, $placement);

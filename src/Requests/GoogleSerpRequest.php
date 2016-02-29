@@ -13,6 +13,7 @@ use paslandau\SerpScraper\Exceptions\GoogleBlockedException;
 use paslandau\SerpScraper\Exceptions\GoogleSerpParsingException;
 use paslandau\SerpScraper\Results\SerpResult;
 use paslandau\SerpScraper\Serps\GoogleSerp;
+use paslandau\WebUtility\WebUtil;
 
 class GoogleSerpRequest implements SerpRequestInterface
 {
@@ -70,10 +71,9 @@ class GoogleSerpRequest implements SerpRequestInterface
     }
 
     /**
-     * @param ClientInterface $client
-     * @return RequestInterface
+     * @return string
      */
-    public function createRequest(ClientInterface $client){
+    public function createRequestUrl(){
         $query = [];
         $query["q"] = $this->keyword;
         if($this->page !== null && $this->page !== 1) {
@@ -97,10 +97,22 @@ class GoogleSerpRequest implements SerpRequestInterface
             $query["nord"] = "1";
         }
 
-        $options = ["query" => $query];
+//        $options = ["query" => $query];
 
         $s = ($this->forceHttp === true )?"":"s";
         $url = sprintf(self::QUERY_URL,$s,$this->host);
+
+        $url = WebUtil::appendQuery($url,$query);
+        return $url;
+    }
+
+    /**
+     * @param ClientInterface $client
+     * @return RequestInterface
+     */
+    public function createRequest(ClientInterface $client){
+        $url = $this->createRequestUrl();
+        $options = [];
         $req = $client->createRequest("GET",$url,$options);
         return $req;
     }

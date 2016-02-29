@@ -1,6 +1,7 @@
 <?php
 
 use GuzzleHttp\Message\Response;
+use GuzzleHttp\Message\ResponseInterface;
 use GuzzleHttp\Stream\Stream;
 use paslandau\ArrayUtility\ArrayUtil;
 use paslandau\IOUtility\IOUtil;
@@ -12,11 +13,51 @@ use paslandau\SerpScraper\Serps\GoogleSerpOrganicPosition;
 class GoogleSerpOrganicPositionTest extends PHPUnit_Framework_TestCase
 {
 
+    /**
+     * @param string $path
+     * @param string $effectiveUrl
+     * @return Response
+     */
+    private function getGuzzleSerpResponse($path,$effectiveUrl = "http://www.google.de/"){
+        $body = IOUtil::getFileContent($path);
+        $bodyStream = new Stream(fopen('php://temp', 'r+'));// see Guzzle 4.1.7 > GuzzleHttp\Adapter\Curl\RequestMediator::writeResponseBody
+        $bodyStream->write($body);
+        $resp = new Response(200, [], $bodyStream);
+        if($effectiveUrl !== null) {
+            $resp->setEffectiveUrl($effectiveUrl);
+        }
+        return $resp;
+    }
+
+    /**
+     * @param ResponseInterface $resp
+     * @param int $pos
+     * @param GoogleSerp $serps
+     * @return DOMNode
+     * @throws GoogleSerpParsingException
+     */
+    private function getOrganicPositionFromSerp(ResponseInterface $resp,$pos,$serps){
+
+        $content = $resp->getBody();
+        $doc = new \DOMDocument();
+        if (!@$doc->loadHTML($content)) {
+            throw new GoogleSerpParsingException($resp, $serps, "Error while parsing SERPs");
+        }
+        $xpath = new \DOMXPath($doc);
+
+        $listingNodes = GoogleSerp::getOrganicPositionList($xpath);
+        $listingNode = $listingNodes->item($pos-1);
+        return $listingNode;
+    }
+
     public function test_ShouldParseNormalSerps()
     {
         $tests = [
             "normal-serps" => [
-                "input" => __DIR__ . "/resources/2015-04-01-google-normal-serps.html",
+                "input" => [
+                    "serp" => __DIR__ . "/resources/2015-04-01-google-normal-serps.html",
+                    "position" => 1
+                ],
                 "expected" => [
                     "title" => "Stiftung Warentest",
                     "url" => "https://www.test.de/",
@@ -25,29 +66,46 @@ class GoogleSerpOrganicPositionTest extends PHPUnit_Framework_TestCase
                     "blockedByRobotsTxt" => false
                 ]
             ],
+            "vertical-maps-old" => [
+                "input" => [
+                    "serp" => __DIR__ . "/resources/2015-04-10-google-vertical-maps-old.html",
+                    "position" => 1
+                ],
+                "expected" => [
+                    "title" => "Lokale Ergebnisse für tchibo in der Nähe von Aalen",
+                    "url" => "https://maps.google.de/maps?um=1&ie=UTF-8&fb=1&gl=de&q=tchibo%20Aalen&hq=tchibo&hnear=0x47991b8414841c9f%3A0xd6fe2d7ab424e68c%2CAalen&sa=X&ei=ooEnVaH-EcvfapD0gOAP&ved=0CBQQtQM",
+                    "description" => null,
+                    "breadCrumb" => null,
+                    "blockedByRobotsTxt" => false
+                ]
+            ],
+            "vertical-maps-new" => [
+                "input" => [
+                    "serp" => __DIR__ . "/resources/2015-08-28-google-vertical-maps-new.html",
+                    "position" => 1
+                ],
+                "expected" => [
+                    "title" => "",
+                    "url" => "http://www.google.de/search?nord=1&q=tchibo%20aachen&npsic=0&rflfq=1&rlha=0&tbm=lcl&sa=X&ved=0CCMQtgNqFQoTCP2-1KCgy8cCFYW0GgodFiILRQ",
+                    "description" => null,
+                    "breadCrumb" => null,
+                    "blockedByRobotsTxt" => false
+                ]
+            ],
         ];
 
         /** @var PHPUnit_Framework_MockObject_MockObject|GoogleSerpRequest $request */
         $request = $this->getMock(GoogleSerpRequest::class, [], [""]);
         $serps = new GoogleSerp($request);
-        $effectiveUrl = "http://www.google.de";
         foreach ($tests as $test => $data) {
-            $path = $data["input"];
+            $path = $data["input"]["serp"];
+            $pos = $data["input"]["position"];
             $expected = $data["expected"];
 
-            $body = IOUtil::getFileContent($path);
-            $resp = $this->getGuzzleResponse(200, $body, [], $effectiveUrl);
-            $position = new GoogleSerpOrganicPosition($serps, 1);
+            $resp = $this->getGuzzleSerpResponse($path);
+            $listingNode = $this->getOrganicPositionFromSerp($resp,$pos,$serps);
 
-            $content = $resp->getBody();
-            $doc = new \DOMDocument();
-            if (!@$doc->loadHTML($content)) {
-                throw new GoogleSerpParsingException($resp, $serps, "Error while parsing SERPs");
-            }
-            $xpath = new \DOMXPath($doc);
-
-            $listingExpression = "(//li[@class = 'g' or contains(./@class,'g ')])[1]";
-            $listingNode = $xpath->query($listingExpression)->item(0);
+            $position = new GoogleSerpOrganicPosition($serps, $pos);
 
             $excMsg = "";
             try {
@@ -73,14 +131,6 @@ class GoogleSerpOrganicPositionTest extends PHPUnit_Framework_TestCase
 
     public function test_ShouldIdentifyVerticals(){
         //todo implement test
-    }
-
-    private function getGuzzleResponse($statusCode, $body, $headers = [])
-    {
-        $bodyStream = new Stream(fopen('php://temp', 'r+'));// see Guzzle 4.1.7 > GuzzleHttp\Adapter\Curl\RequestMediator::writeResponseBody
-        $bodyStream->write($body);
-        $resp = new Response($statusCode, $headers, $bodyStream);
-        return $resp;
     }
 
     private function toArray(GoogleSerpOrganicPosition $position)
