@@ -1,25 +1,34 @@
-#serp-scraper
+# DEPRECATED ⛔ 
+This repository has been deprecated as of 2019-01-27. 
+
+That code was written a long time ago and has been unmaintained for several years. 
+Thus, repository will now be [archived](https://github.blog/2017-11-08-archiving-repositories/).
+If you are interested in taking over ownership, feel free to [contact me](https://www.pascallandau.com/about/).
+
+---
+
+# serp-scraper
 Library to scrape search engine results pages
 
 <!---
 [![Build Status](https://travis-ci.org/paslandau/serp-scraper.svg?branch=master)](https://travis-ci.org/paslandau/serp-scraper)
 -->
 
-#WORK IN PROGRESS!
+# WORK IN PROGRESS!
 
 - personal backup
 - no unit tests
 - use at your own risk
 
-##Description
+## Description
 
 Coming soon...
 
-##Requirements
+## Requirements
 
 - PHP >= 5.5
 
-##Installation
+## Installation
 
 The recommended way to install serp-scraper is through [Composer](http://getcomposer.org/).
 
